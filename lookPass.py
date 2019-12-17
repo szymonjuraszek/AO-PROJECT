@@ -10,20 +10,24 @@ from skimage.color import label2rgb
 import math
 import numpy as np
 
+import warnings
+
+warnings.filterwarnings("ignore")
+
 # ======================================================================================================================
 
-colorDefault = np.zeros((3), 'uint8')
+colorDefault = np.zeros(3, 'uint8')
 colorDefault[0] = 0
 colorDefault[1] = 0
 colorDefault[2] = 0
 
-colors = np.zeros((36, 3), 'uint16')
-for i in range(15):
+colors = np.zeros((39, 3), 'uint16')
+for i in range(39):
     colors[i][0] = 0
     colors[i][1] = random.randint(0, 255)
     colors[i][2] = random.randint(0, 255)
 
-# Wszystkie obiekty ktore nie spelniaja warunkow beda koloru CZERWONEGO
+# Wszystkie obiekty ktore nie spelniaja warunkow beda koloru NIEBIESKIEGO
 R = 255
 G = 0
 B = 0
@@ -31,74 +35,49 @@ B = 0
 
 # ======================================================================================================================
 
-def setColorBasedOnCoefficient(tgA):
-    if tgA >= 0 and tgA < 20:
-        colorDefault[0] = colors[1, 0]
-        colorDefault[1] = colors[1, 1]
-        colorDefault[2] = colors[1, 2]
-    elif tgA > 20 and tgA < 40:
-        colorDefault[0] = colors[2, 0]
-        colorDefault[1] = colors[2, 1]
-        colorDefault[2] = colors[2, 2]
-    elif tgA > 40 and tgA < 60:
-        colorDefault[0] = colors[3, 0]
-        colorDefault[1] = colors[3, 1]
-        colorDefault[2] = colors[3, 2]
-    elif tgA > 60 and tgA < 80:
-        colorDefault[0] = colors[4, 0]
-        colorDefault[1] = colors[4, 1]
-        colorDefault[2] = colors[4, 2]
-    elif tgA > 80 and tgA < 100:
-        colorDefault[0] = colors[5, 0]
-        colorDefault[1] = colors[5, 1]
-        colorDefault[2] = colors[5, 2]
-    elif tgA > 100 and tgA < 120:
-        colorDefault[0] = colors[6, 0]
-        colorDefault[1] = colors[6, 1]
-        colorDefault[2] = colors[6, 2]
-    elif tgA > 120 and tgA < 360:
-        colorDefault[0] = colors[7, 0]
-        colorDefault[1] = colors[7, 1]
-        colorDefault[2] = colors[7, 2]
+def isclose(angle, a, b, i, angles):
+    if angle >= a and angle < b:
+        colorDefault[0] = colors[i, 0]
+        colorDefault[1] = colors[i, 1]
+        colorDefault[2] = colors[i, 2]
+        angles[i+1] = angles[i+1] + 1
+        return 1
+    elif angle >= 85:
+        colorDefault[0] = colors[37, 0]
+        colorDefault[1] = colors[37, 1]
+        colorDefault[2] = colors[37, 2]
+        angles[37] = angles[37] + 1
+        return 1
+    elif angle <= -85:
+        colorDefault[0] = colors[38, 0]
+        colorDefault[1] = colors[38, 1]
+        colorDefault[2] = colors[38, 2]
+        angles[0] = angles[0] + 1
+        return 1
+    return 0
 
-    elif tgA < 0 and tgA > -20:
-        colorDefault[0] = colors[8, 0]
-        colorDefault[1] = colors[8, 1]
-        colorDefault[2] = colors[8, 2]
-    elif tgA < -20 and tgA > -40:
-        colorDefault[0] = colors[9, 0]
-        colorDefault[1] = colors[9, 1]
-        colorDefault[2] = colors[9, 2]
-    elif tgA < -40 and tgA > -60:
-        colorDefault[0] = colors[10, 0]
-        colorDefault[1] = colors[10, 1]
-        colorDefault[2] = colors[10, 2]
-    elif tgA < -60 and tgA > -80:
-        colorDefault[0] = colors[11, 0]
-        colorDefault[1] = colors[11, 1]
-        colorDefault[2] = colors[11, 2]
-    elif tgA < -80 and tgA > -100:
-        colorDefault[0] = colors[12, 0]
-        colorDefault[1] = colors[12, 1]
-        colorDefault[2] = colors[12, 2]
-    elif tgA < -100 and tgA > -120:
-        colorDefault[0] = colors[13, 0]
-        colorDefault[1] = colors[13, 1]
-        colorDefault[2] = colors[13, 2]
-    elif tgA < -120 and tgA > -360:
-        colorDefault[0] = colors[14, 0]
-        colorDefault[1] = colors[14, 1]
-        colorDefault[2] = colors[14, 2]
-    else:
-        print("Wspolczynnik a: ", tgA)
-        print("ERROR!!")
+
+def setColorBasedOnCoefficient(angle, angles):
+    flag = 0
+    # Dla dodatnich
+    for i in range(18):
+        if isclose(angle, i * 5, (i + 1) * 5, i, angles) == 1:
+            flag = 1
+            break
+
+    # Dla ujemnych
+    if flag == 0:
+        for i in range(18):
+            if isclose(angle, (i + 1) * (-5), i * (-5), i + 18, angles) == 1:
+                break
 
 
 # ======================================================================================================================
 
 # 0 to czarny a 255 to bialy
 # 0 to czarny a 65535 to bialy
-def fill(m, w, kernel, Ac, x, y):
+def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
+    rgbArray = np.zeros((x, y, 3), 'uint8')
     tmpTable1 = np.zeros((x, y), 'uint16')
     for i in range(x):
         for j in range(y):
@@ -114,7 +93,6 @@ def fill(m, w, kernel, Ac, x, y):
         tmpTable2 = tmpTable1
 
     # Wyznaczane sa podobszary obejmujace dany obiekt na obrazie
-    rgbArray = np.zeros((x, y, 3), 'uint8')
 
     south = np.zeros(2, 'uint16')
     north = np.zeros(2, 'uint16')
@@ -132,6 +110,7 @@ def fill(m, w, kernel, Ac, x, y):
                 rgbArray[i][j][0] = R
                 rgbArray[i][j][1] = G
                 rgbArray[i][j][2] = B
+                checkedPoints[i][j] = 255
 
                 if west[1] > j:
                     west[0] = i
@@ -174,7 +153,6 @@ def fill(m, w, kernel, Ac, x, y):
             Y = int(center_of_mass[1])
 
             img = cv2.Canny(img, 100, 200)
-            # img[X, Y] = 50
 
             # Rozmiar wycietej czesci obrazu
             dimensions = img.shape
@@ -204,12 +182,6 @@ def fill(m, w, kernel, Ac, x, y):
                             point1[0] = j
                             point1[1] = i
 
-        # print(longestLength)
-        # print("m", m)
-        # print("w", w)
-        # print(point)
-        # print(point1)
-
         # Nie mozna dawac punktow do metody np.polyfit ktore wskazuja na [0,0]
         if point1[0] == 0 and point1[1] == 0:
             point1[0] = 0
@@ -221,10 +193,12 @@ def fill(m, w, kernel, Ac, x, y):
         # Wspolczynniki funkcji liniowej
         coefficients = np.polyfit(point, point1, 1)
 
-        if int(longestLength) > 44 and int(longestLength) < 57:
-            setColorBasedOnCoefficient(int(coefficients[0]))
+        if int(longestLength) > 35 and int(longestLength) < 60:
+            angle = int(math.degrees(math.atan(coefficients[0])))
+            setColorBasedOnCoefficient(angle, angles)
+            elements[0] = elements[0] + 1
 
-            print("Length of element:", longestLength)
+            # print("kat ALFA: ", angle)
             for i in range(x):
                 for j in range(y):
                     if tmpTable1[i][j] != 65535:
