@@ -40,7 +40,7 @@ def isclose(angle, a, b, i, angles):
         colorDefault[0] = colors[i, 0]
         colorDefault[1] = colors[i, 1]
         colorDefault[2] = colors[i, 2]
-        angles[i+1] = angles[i+1] + 1
+        angles[i + 1] = angles[i + 1] + 1
         return 1
     elif angle >= 85:
         colorDefault[0] = colors[37, 0]
@@ -140,6 +140,9 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
     # Jesli wszystkie warunki sa spelnione wykonywana jest ta czesc programu(walidacja)
     if (flag == 1) and (west[1] < east[1]) and (north[0] < south[0]):
         img = rgbArray[north[0]:south[0], west[1]:east[1], :]
+        img = cv2.dilate(img, kernel, iterations=3)
+        img = cv2.erode(img, kernel, iterations=3)
+        # cv2.imshow(str(elements[0]),img)
         count = np.count_nonzero(img)
 
         if count > 0:
@@ -153,6 +156,7 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
             Y = int(center_of_mass[1])
 
             img = cv2.Canny(img, 100, 200)
+            # cv2.imshow("canny", img)
 
             # Rozmiar wycietej czesci obrazu
             dimensions = img.shape
@@ -182,6 +186,27 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
                             point1[0] = j
                             point1[1] = i
 
+            srodek = np.zeros(2, 'uint16')
+            srodek[0] = int((point[0] + point1[0]) / 2)
+            srodek[1] = int((point[1] + point1[1]) / 2)
+
+            IMPORTANT = 2
+            shortestLength = 1000
+            point2 = np.zeros(2, 'uint16')
+            for i in range(xx):
+                for j in range(yy):
+                    if img[i][j] == 255:
+                        length = math.sqrt(math.pow(i - srodek[0], 2) + math.pow(j - srodek[1], 2))
+                        if length < shortestLength and length > IMPORTANT:
+                            shortestLength = length
+                            point2[0] = j
+                            point2[1] = i
+
+        # print(shortestLength)
+        # print(longestLength)
+        # print(point2)
+        # print(srodek)
+        # print(longestLength / (2 * shortestLength))
         # Nie mozna dawac punktow do metody np.polyfit ktore wskazuja na [0,0]
         if point1[0] == 0 and point1[1] == 0:
             point1[0] = 0
@@ -189,52 +214,68 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
         if point[0] == 0 and point[1] == 0:
             point[0] = 0
             point[1] = 1
+        if point2[0] == 0 and point2[1] == 0:
+            point2[0] = 0
+            point2[1] = 1
 
         # Wspolczynniki funkcji liniowej
         coefficients = np.polyfit(point, point1, 1)
+        # coefficients2 = np.polyfit(point2, point, 1)
 
-        if int(longestLength) > 35 and int(longestLength) < 60:
-            angle = int(math.degrees(math.atan(coefficients[0])))
-            setColorBasedOnCoefficient(angle, angles)
-            elements[0] = elements[0] + 1
 
-            # print("kat ALFA: ", angle)
-            for i in range(x):
-                for j in range(y):
-                    if tmpTable1[i][j] != 65535:
-                        rgbArray[i][j][0] = colorDefault[0]
-                        rgbArray[i][j][1] = colorDefault[1]
-                        rgbArray[i][j][2] = colorDefault[2]
+        if int(longestLength) > 20 and int(longestLength) < 65:
+            if longestLength / (2 * shortestLength) > 2 and longestLength / (2 * shortestLength) < 7:
 
-        # print('a =', coefficients[1])
-        # print('b =', coefficients[0])
-        #
-        # # coefficients1 = (-1 / coefficients[1], coefficients[0])
-        # # print('a =', coefficients1[0])
-        # # print('b =', coefficients1[1])
-        # #
-        # # intersectionX = (coefficients[0] - coefficients1[1]) / (coefficients1[0] - coefficients[1])
-        # # intersectionY = intersectionX * coefficients[1] + coefficients[0]
-        # # print("punkt przeciecia X= " ,intersectionX)
-        # # print("punkt przeciecia Y= " ,intersectionY)
-        # # polynomial = np.poly1d((coefficients[1], coefficients[0]))
-        # x_axis1 = np.linspace(0, 500, 500)
-        # y_axis1 = polynomial(x_axis1)
-        # # polynomial = np.poly1d(coefficients1)
-        # # x_axis = np.linspace(0, 500, 500)
-        # # y_axis = polynomial(x_axis)
-        # #
-        # # # ...and plot the points and the line
-        # # plt.plot(x_axis1, y_axis1)
-        # # plt.plot(x_axis, y_axis)
-        # # plt.plot(point1[0], point[0], 'go')
-        # # plt.plot(point1[1], point[1], 'go')
-        # # plt.grid('on')
-        # # plt.show()
-        #
-        # lineThickness = 1
-        # cv2.line(img, (point1[0], point1[1]), (point[0], point[1]), (255, 0, 0), lineThickness)
-        # # # # cv2.line(img, (int(intersectionY), int(intersectionX)), (X, Y), (255, 0, 0), lineThickness)
-        # cv2.imshow("Original Image", img)
+                angle = int(math.degrees(math.atan(coefficients[0])))
+                setColorBasedOnCoefficient(angle, angles)
+                elements[0] = elements[0] + 1
+
+                # print(longestLength/shortestLength)
+                lineThickness = 1
+                cv2.line(img, (point1[0], point1[1]), (point[0], point[1]), (255, 0, 0), lineThickness)
+                cv2.line(img, (point2[0], point2[1]), (srodek[0], srodek[1]), (255, 0, 0), lineThickness)
+
+                cv2.imshow(str(elements[0]), img)
+
+                # print(elements[0])
+                # print("kat ALFA: ", angle)
+                for i in range(x):
+                    for j in range(y):
+                        if tmpTable1[i][j] != 65535:
+                            rgbArray[i][j][0] = colorDefault[0]
+                            rgbArray[i][j][1] = colorDefault[1]
+                            rgbArray[i][j][2] = colorDefault[2]
+
+
+# print('a =', coefficients[0])
+# print('b =', coefficients[1])
+# #
+# coefficients1 = (-1 / coefficients[0], coefficients[1])
+# print('a new =', coefficients1[0])
+# print('b new =', coefficients1[1])
+#
+# print('a imporatnt =', coefficients2[0])
+# print('b imporatnt =', coefficients2[1])
+# #
+# intersectionX = (coefficients[0] - coefficients1[1]) / (coefficients1[0] - coefficients[1])
+# intersectionY = intersectionX * coefficients[1] + coefficients[0]
+# # print("punkt przeciecia X= " ,intersectionX)
+# # print("punkt przeciecia Y= " ,intersectionY)
+# # polynomial = np.poly1d((coefficients[1], coefficients[0]))
+# x_axis1 = np.linspace(0, 500, 500)
+# y_axis1 = polynomial(x_axis1)
+# # polynomial = np.poly1d(coefficients1)
+# # x_axis = np.linspace(0, 500, 500)
+# # y_axis = polynomial(x_axis)
+# #
+# # # ...and plot the points and the line
+# # plt.plot(x_axis1, y_axis1)
+# # plt.plot(x_axis, y_axis)
+# # plt.plot(point1[0], point[0], 'go')
+# # plt.plot(point1[1], point[1], 'go')
+# # plt.grid('on')
+# # plt.show()
+#
+
 
     return rgbArray

@@ -14,7 +14,7 @@ from operationOnHistogram import drawHistogram, drawHistogramForAngle
 
 # ----------------------------------------------------------------------------------------------------------------------
 
-image = cv2.imread('image/tif/ziarna.tif')
+image = cv2.imread('image/kawa.jpg')
 # cv2.imshow("Original Image", image)
 drawHistogram(image, "Histogram for Original Image (RGB)")
 
@@ -46,6 +46,7 @@ kernel[2][1] = 65535
 kernel[2][2] = 0
 
 blackAndWhiteImage = cv2.erode(blackAndWhiteImage, kernel, iterations=1)
+# blackAndWhiteImage = cv2.dilate(blackAndWhiteImage, kernel, iterations=1)
 cv2.imshow("Erode Binary Image", blackAndWhiteImage)
 
 checkedPoints = np.zeros((x, y), 'uint8')
@@ -61,11 +62,11 @@ result = np.zeros((x, y, 3), 'uint8')
 for i in range(5, x, 20):
     for j in range(5, y, 20):
         if checkedPoints[i][j] != 255 and Ac[i][j] != 65535:
-            tmpTable1 = fill(i, j, kernel, Ac, x, y, checkedPoints, elements,angles)
+            tmpTable1 = fill(i, j, kernel, Ac, x, y, checkedPoints, elements, angles)
             result = result + tmpTable1
 
 img = Image.fromarray(result)
-img.save('wyniki/result.tif')
+img.save('wyniki/najnowszy.tif', )
 
 # Czerwony kolor to wszystkie obiekty ktore nie spelniaja warunkow, nie zaliczaja sie
 print("Znaleziono :", elements[0])
@@ -78,7 +79,7 @@ print("END")
 # ================================================== Histogram =========================================================
 xx = [e + 1 for e in range(38)]
 
-drawHistogramForAngle(xx,angles)
+drawHistogramForAngle(xx, angles)
 exampleResult = cv2.imread('wyniki/result.tif')
 drawHistogram(exampleResult, "Histogram for proceed image(RGB)")
 

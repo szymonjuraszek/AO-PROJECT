@@ -13,8 +13,9 @@ def drawHistogram(image, description):
     plt.ylabel("Number of occurrences")
     plt.show()
 
-def drawHistogramForAngle(x,y):
+
+def drawHistogramForAngle(x, y):
     plt.bar(x, y, align='center')  # A bar chart
-    plt.xlabel('to 0 -> 18 (minus degree) 19 -> 38 (positive)')
+    plt.xlabel('to 0 -> 18 (positive degree) 19 -> 38 (negative)')
     plt.ylabel('Frequency')
     plt.show()
