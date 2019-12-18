@@ -1,16 +1,12 @@
-import numpy as np
-import cv2
-import random
-import imageio as iio
-from skimage import filters
-from skimage.color import rgb2gray  # only needed for incorrectly saved images
-from skimage.measure import regionprops
-import matplotlib.pyplot as plt
-from skimage.color import label2rgb
 import math
-import numpy as np
-
+import random
 import warnings
+
+import cv2
+import numpy as np
+from PIL import Image
+from skimage import filters
+from skimage.measure import regionprops
 
 warnings.filterwarnings("ignore")
 
@@ -27,13 +23,31 @@ for i in range(39):
     colors[i][1] = random.randint(0, 255)
     colors[i][2] = random.randint(0, 255)
 
-# Wszystkie obiekty ktore nie spelniaja warunkow beda koloru NIEBIESKIEGO
+# Wszystkie obiekty ktore nie spelniaja warunkow beda koloru BIALEGO
 R = 255
-G = 0
-B = 0
+G = 255
+B = 255
 
 
 # ======================================================================================================================
+def computeTg(A, B):
+    if A[0] <= B[0] and A[1] <= B[1]:
+        lengthA = B[0] - A[0]
+        lengthB = B[1] - A[1]
+        return -(lengthB / lengthA)
+    elif A[0] >= B[0] and A[1] <= B[1]:
+        lengthA = A[0] - B[0]
+        lengthB = B[1] - A[1]
+        return lengthB / lengthA
+    elif A[0] >= B[0] and A[1] >= B[1]:
+        lengthA = A[0] - B[0]
+        lengthB = A[1] - B[1]
+        return -(lengthB / lengthA)
+    elif A[0] <= B[0] and A[1] >= B[1]:
+        lengthA = B[0] - A[0]
+        lengthB = A[1] - B[1]
+        return lengthB / lengthA
+
 
 def isclose(angle, a, b, i, angles):
     if angle >= a and angle < b:
@@ -86,13 +100,11 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
     tmpTable1[m][w] = 0
     tmpTable2 = tmpTable1
 
-    for i in range(800):
+    for i in range(1200):
         tmpTable1 = cv2.erode(tmpTable1, kernel, iterations=1) | Ac
         if np.array_equal(tmpTable1, tmpTable2):
             break
         tmpTable2 = tmpTable1
-
-    # Wyznaczane sa podobszary obejmujace dany obiekt na obrazie
 
     south = np.zeros(2, 'uint16')
     north = np.zeros(2, 'uint16')
@@ -128,21 +140,20 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
                 south[0] = i
                 south[1] = j
 
-    if north[0] != 0:
-        north[0] = north[0] - 1
-    if west[1] != 0:
-        west[1] = west[1] - 1
-    if south[0] != x:
-        south[0] = south[0] + 1
-    if east[1] != y:
-        east[1] = east[1] + 1
+    if north[0] - 3 > 0:
+        north[0] = north[0] - 3
+    if west[1] - 3 > 0:
+        west[1] = west[1] - 3
+    if south[0] + 3 < x:
+        south[0] = south[0] + 3
+    if east[1] + 3 < y:
+        east[1] = east[1] + 3
 
     # Jesli wszystkie warunki sa spelnione wykonywana jest ta czesc programu(walidacja)
     if (flag == 1) and (west[1] < east[1]) and (north[0] < south[0]):
         img = rgbArray[north[0]:south[0], west[1]:east[1], :]
         img = cv2.dilate(img, kernel, iterations=3)
         img = cv2.erode(img, kernel, iterations=3)
-        # cv2.imshow(str(elements[0]),img)
         count = np.count_nonzero(img)
 
         if count > 0:
@@ -150,13 +161,11 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
             labeled_foreground = (img > threshold_value).astype(int)
             properties = regionprops(labeled_foreground, img)
             center_of_mass = properties[0].centroid
-            weighted_center_of_mass = properties[0].weighted_centroid
 
             X = int(center_of_mass[0])
             Y = int(center_of_mass[1])
 
             img = cv2.Canny(img, 100, 200)
-            # cv2.imshow("canny", img)
 
             # Rozmiar wycietej czesci obrazu
             dimensions = img.shape
@@ -169,7 +178,7 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
             for i in range(xx):
                 for j in range(yy):
                     if img[i][j] == 255:
-                        length = math.sqrt(math.pow(i - X, 2) + math.pow(j - Y, 2))
+                        length = math.sqrt(math.pow(j - X, 2) + math.pow(i - Y, 2))
                         if length > longestLength:
                             longestLength = length
                             point[0] = j
@@ -180,7 +189,7 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
             for i in range(xx):
                 for j in range(yy):
                     if img[i][j] == 255:
-                        length = math.sqrt(math.pow(i - point[1], 2) + math.pow(j - point[0], 2))
+                        length = math.sqrt(math.pow(j - point[0], 2) + math.pow(i - point[1], 2))
                         if length > longestLength:
                             longestLength = length
                             point1[0] = j
@@ -190,23 +199,20 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
             srodek[0] = int((point[0] + point1[0]) / 2)
             srodek[1] = int((point[1] + point1[1]) / 2)
 
-            IMPORTANT = 2
             shortestLength = 1000
             point2 = np.zeros(2, 'uint16')
             for i in range(xx):
                 for j in range(yy):
                     if img[i][j] == 255:
-                        length = math.sqrt(math.pow(i - srodek[0], 2) + math.pow(j - srodek[1], 2))
-                        if length < shortestLength and length > IMPORTANT:
+                        length = math.sqrt(math.pow(j - srodek[0], 2) + math.pow(i - srodek[1], 2))
+                        if length < shortestLength:
                             shortestLength = length
                             point2[0] = j
                             point2[1] = i
 
-        # print(shortestLength)
-        # print(longestLength)
-        # print(point2)
-        # print(srodek)
-        # print(longestLength / (2 * shortestLength))
+        if shortestLength == 0:
+            shortestLength = 1
+
         # Nie mozna dawac punktow do metody np.polyfit ktore wskazuja na [0,0]
         if point1[0] == 0 and point1[1] == 0:
             point1[0] = 0
@@ -218,64 +224,30 @@ def fill(m, w, kernel, Ac, x, y, checkedPoints, elements, angles):
             point2[0] = 0
             point2[1] = 1
 
-        # Wspolczynniki funkcji liniowej
-        coefficients = np.polyfit(point, point1, 1)
-        # coefficients2 = np.polyfit(point2, point, 1)
+        tg = computeTg(point, point1)
 
+        if int(longestLength) > 25 and int(longestLength) < 250:
+            if longestLength / (2 * shortestLength) > 1 and longestLength / (2 * shortestLength) < 4:
 
-        if int(longestLength) > 20 and int(longestLength) < 65:
-            if longestLength / (2 * shortestLength) > 2 and longestLength / (2 * shortestLength) < 7:
-
-                angle = int(math.degrees(math.atan(coefficients[0])))
+                angle = int(math.degrees(math.atan(tg)))
                 setColorBasedOnCoefficient(angle, angles)
                 elements[0] = elements[0] + 1
 
-                # print(longestLength/shortestLength)
                 lineThickness = 1
                 cv2.line(img, (point1[0], point1[1]), (point[0], point[1]), (255, 0, 0), lineThickness)
                 cv2.line(img, (point2[0], point2[1]), (srodek[0], srodek[1]), (255, 0, 0), lineThickness)
 
-                cv2.imshow(str(elements[0]), img)
+                IMAGE_DESTINATION_PATH = 'results/angles/'
+                img = Image.fromarray(img)
+                img.save(IMAGE_DESTINATION_PATH + str(elements[0]) + '.tif')
 
-                # print(elements[0])
-                # print("kat ALFA: ", angle)
+                print("Elements number: ", elements[0])
+                print("Angle for object: ", angle)
                 for i in range(x):
                     for j in range(y):
                         if tmpTable1[i][j] != 65535:
                             rgbArray[i][j][0] = colorDefault[0]
                             rgbArray[i][j][1] = colorDefault[1]
                             rgbArray[i][j][2] = colorDefault[2]
-
-
-# print('a =', coefficients[0])
-# print('b =', coefficients[1])
-# #
-# coefficients1 = (-1 / coefficients[0], coefficients[1])
-# print('a new =', coefficients1[0])
-# print('b new =', coefficients1[1])
-#
-# print('a imporatnt =', coefficients2[0])
-# print('b imporatnt =', coefficients2[1])
-# #
-# intersectionX = (coefficients[0] - coefficients1[1]) / (coefficients1[0] - coefficients[1])
-# intersectionY = intersectionX * coefficients[1] + coefficients[0]
-# # print("punkt przeciecia X= " ,intersectionX)
-# # print("punkt przeciecia Y= " ,intersectionY)
-# # polynomial = np.poly1d((coefficients[1], coefficients[0]))
-# x_axis1 = np.linspace(0, 500, 500)
-# y_axis1 = polynomial(x_axis1)
-# # polynomial = np.poly1d(coefficients1)
-# # x_axis = np.linspace(0, 500, 500)
-# # y_axis = polynomial(x_axis)
-# #
-# # # ...and plot the points and the line
-# # plt.plot(x_axis1, y_axis1)
-# # plt.plot(x_axis, y_axis)
-# # plt.plot(point1[0], point[0], 'go')
-# # plt.plot(point1[1], point[1], 'go')
-# # plt.grid('on')
-# # plt.show()
-#
-
 
     return rgbArray
